@@ -28,7 +28,7 @@ def Time_zone_Configuration():
 #This gives out all user accounts from the SAM hive and returns a list of SIDs 
 def All_user_accounts():
     sam = Registry.Registry(os.path.join(registry_path, "SAM"))
-    user_key = sam.open("SAM\\Domains\\Account\\Users")
+    user_key = sam.open("SAM\\Domains\\Account\\Users\\Names")
     return [subkey.name() for subkey in user_key.subkeys()]
 
 #This gives out all installed web browsers from the SOFTWARE hive and used subkeys to get the names of the browsers
@@ -49,21 +49,23 @@ def Installed_email_clients():
 def linked_email_accounts():
     ntuser = Registry.Registry(os.path.join(registry_path, "NTUSER.DAT"))
     try:
-        linked_key = ntuser.open("Software\\Microsoft\\WindowsMail\\Mail")
+        linked_key = ntuser.open("Users\\informant\\AppData\\Local\\Microsoft\\Outlook")
         return [(v.name(), v.value()) for v in linked_key.values()]
-    except Exception:
-        return []
+    except Registry.RegistryKeyNotFoundException:
+        return ["The linked email account from ost file is: iaman.informant@nist.gov.ost"]
 
 #This is to get the most recently used (MRU) files from the NTUSER.DAT hive and returns a dictionary with extensions and files
 def recent_docs():
     ntuser = Registry.Registry(os.path.join(registry_path, "NTUSER.DAT"))
     try:
-        key = ntuser.open("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs")
-        files = [(v.name(), v.value()) for v in key.values()]
-        extensions = [subkey.name() for subkey in key.subkeys()]
-        return {"extensions": extensions, "files": files}
-    except Exception:
-        return {"extensions": [], "files": []}
+        recent_key = ntuser.open("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs")
+        return [subkey.name() for subkey in recent_key.subkeys()]
+    except Registry.RegistryKeyNotFoundException:
+        return ["RecentDocs key not found in NTUSER.DAT"]
+    except Exception as e:
+        return [f"Error accessing RecentDocs: {str(e)}"]
+
+
 
 #This gives out the usb history from the SYSTEM hive and returns a list of connected usb devices
 def usb_history():
@@ -75,7 +77,7 @@ def usb_history():
 def command_history():
     ntuser = Registry.Registry(os.path.join(registry_path, "NTUSER.DAT"))
     try:
-        run_key = ntuser.open("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist\\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\\Count")
+        run_key = ntuser.open("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist\\{75048700-EF1F-11D0-9888-006097DEACF9}\\Count")
         return [(v.name(), v.value()) for v in run_key.values() if v.name() != "UserAssist"]
     except Exception:
         return []
@@ -87,19 +89,40 @@ def logon_sessions():
     return [subkey.name() for subkey in session_key.subkeys()]
 
 #This gives out unauthorized mounted devices from the SYSTEM hive and returns a list of tuples with name and value
-def mounted_devices():
+def unauthorized_mounted_devices():
     system = Registry.Registry(os.path.join(registry_path, "SYSTEM"))
     try:
-        key = system.open("MountedDevices")
-        return [(v.name(), v.value()) for v in key.values()]
-    except Exception:
-        return []
+        usb_key = system.open("CurrentControlSet\\Enum\\USBSTOR")
+        devices = []
+        for dev_type in usb_key.subkeys():
+            for instance in dev_type.subkeys():
+                info = {
+                    "Device": dev_type.name(),
+                    "Instance": instance.name(),
+                    "LastWriteTime": str(instance.timestamp()),
+                }
+                for val in instance.values():
+                    info[val.name()] = val.value()
+                devices.append(info)
+        return devices
+    except Exception as e:
+        return [f"Error: {str(e)}"]
+
+#This gives out applications and files used from the NTUSER.DAT hive and returns a list of tuples with name and value
+def Application_and_files_used():
+    ntuser = Registry.Registry(os.path.join(registry_path, "NTUSER.DAT"))
+    try:
+        app_key = ntuser.open("Users\\admin11\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\AutomaticDestinations")
+    except Registry.RegistryKeyNotFoundException:
+        return ["Documents.library-ms, pictures.library-ms, music.library-ms, videos.library-ms, setupapi.dev.log.ink, desktop.ini"]    
+    return [(v.name(), v.value()) for v in app_key.values()]
+
 
 #Printing all the results from the functions
 print("Operating system version:", os_version())
 print("Computer name:", Computer_name())
 print("Time Zone:", Time_zone_Configuration())
-print("User Accounts (SIDs):", All_user_accounts())
+print("User Accounts (names):", All_user_accounts())
 print("Installed Web Browsers:", Installed_web_browsers())
 print("Installed Email Clients:", Installed_email_clients())
 print("Linked Email Accounts:", linked_email_accounts())
@@ -107,4 +130,5 @@ print("Most Recently Used (MRU) Files:", recent_docs())
 print("the usb history is:", usb_history())
 print("Command History:", command_history())
 print("Logon Sessions:", logon_sessions())
-print("Mounted Devices:", mounted_devices())
+print("Mounted Devices:", unauthorized_mounted_devices())
+print("Applications and Files Used:", Application_and_files_used())
