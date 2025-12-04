@@ -11,6 +11,7 @@ def os_version():
     return{
         "ProductName":os_key.value("ProductName").value(),
         "CurrentVersion":os_key.value("CurrentVersion").value(),
+        "CurrentBuild":os_key.value("CurrentBuild").value(),
     }
 
 #This gives out the computer name from the SYSTEM hive
@@ -66,7 +67,6 @@ def recent_docs():
         return [f"Error accessing RecentDocs: {str(e)}"]
 
 
-
 #This gives out the usb history from the SYSTEM hive and returns a list of connected usb devices
 def usb_history():
     system = Registry.Registry(os.path.join(registry_path, "SYSTEM"))
@@ -81,6 +81,13 @@ def command_history():
         return [(v.name(), v.value()) for v in run_key.values() if v.name() != "UserAssist"]
     except Exception:
         return []
+    
+#This gives out installed applications from the SOFTWARE hive and returns a list of application names
+def installed_applications():
+    software = Registry.Registry(os.path.join(registry_path, "SOFTWARE"))
+    uninstall_key_path = "Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    uninstall_key = software.open(uninstall_key_path)
+    return [subkey.name() for subkey in uninstall_key.subkeys()]
 
 #This gives out logon sessions from the SYSTEM hive and returns a list of session names
 def logon_sessions():
@@ -129,6 +136,7 @@ print("Linked Email Accounts:", linked_email_accounts())
 print("Most Recently Used (MRU) Files:", recent_docs())
 print("the usb history is:", usb_history())
 print("Command History:", command_history())
+print("Installed Applications:", installed_applications())
 print("Logon Sessions:", logon_sessions())
 print("Mounted Devices:", unauthorized_mounted_devices())
 print("Applications and Files Used:", Application_and_files_used())
